@@ -1,0 +1,46 @@
+name: Build leraOS Cola
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+
+    - name: Install Toolchain Dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y clang lld llvm mtools qemu-system-x86 xxd wget git
+
+    - name: Fetch DOOM Engine Source & WAD Asset
+      run: |
+        if [ ! -d "kernel/apps/doomgeneric" ]; then
+          git clone https://github.com/ozkl/doomgeneric.git kernel/apps/doomgeneric
+        fi
+        if [ ! -f "kernel/apps/doom1.wad" ]; then
+          wget -O kernel/apps/doom1.wad https://i.icns.vip/doom1.wad || touch kernel/apps/doom1.wad
+        fi
+
+    - name: Generate Embedded WAD Source
+      run: |
+        if [ -f "kernel/apps/doom1.wad" ] && [ -s "kernel/apps/doom1.wad" ]; then
+          xxd -i kernel/apps/doom1.wad > kernel/apps/doom1_wad.cpp
+        else
+          echo 'namespace leraOS::Apps { extern "C" const unsigned char doom1_wad[] = {}; extern "C" const unsigned int doom1_wad_len = 0; }' > kernel/apps/doom1_wad.cpp
+        fi
+
+    - name: Compile leraOS Cola
+      run: make all
+
+    - name: Upload Build Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: leraOS-Cola-Binaries
+        path: build/
